@@ -423,6 +423,25 @@ DEPARTMENT_KEYWORDS = {
 16. Return JSON response to user
 ```
 
+### 2.4 Enhanced Services Layer
+
+The system includes additional services for enhanced functionality:
+
+| Service | File | Purpose |
+|---------|------|---------|
+| **SemanticCacheService** | `semantic_cache.py` | Cache similar queries to reduce LLM calls |
+| **QueryProcessor** | `query_processor.py` | Spell correction, abbreviation expansion |
+| **IntentDetector** | `intent_detector.py` | Multi-intent classification |
+| **EscalationService** | `escalation.py` | Confidence-based human escalation |
+| **AchievementService** | `achievements.py` | Gamification badges and points |
+| **TrainingService** | `training.py` | Interactive modules with quizzes |
+| **CalendarService** | `calendar_service.py` | Event management, ICS export |
+| **FeedbackService** | `feedback.py` | Thumbs up/down on responses |
+| **FAQService** | `faq_service.py` | Admin FAQ CRUD operations |
+| **ChurnPredictionService** | `churn_prediction.py` | Engagement-based risk scoring |
+| **WorkflowService** | `workflows.py` | Trigger-based automation |
+| **TranslationService** | `i18n.py` | Arabic/English translations |
+
 ## 3. Security Model
 
 ### 3.1 Authentication System
@@ -905,15 +924,17 @@ services:
 - Fine-tune embedding model on domain data
 - Semantic re-ranking with cross-encoders
 - Feedback loop for routing model retraining
-- Query expansion and spell correction
+- ~~Query expansion and spell correction~~ ✅ Implemented (QueryProcessor)
+- ~~Semantic caching~~ ✅ Implemented (SemanticCacheService)
+- ~~Multi-intent detection~~ ✅ Implemented (IntentDetector)
 - Conversation summarization
 
 ### 8.3 Features
 - Voice interface (speech-to-text, text-to-speech)
-- Multi-language support (i18n)
-- Calendar integration for task deadlines
+- ~~Multi-language support (i18n)~~ ✅ Implemented (Arabic/English)
+- ~~Calendar integration for task deadlines~~ ✅ Implemented (internal + OAuth ready)
 - Slack/Teams integration
-- Interactive training modules
+- ~~Interactive training modules~~ ✅ Implemented
 
 ### 8.4 MLOps
 - Automated retraining pipeline

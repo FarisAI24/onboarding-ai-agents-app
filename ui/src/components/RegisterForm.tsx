@@ -72,10 +72,10 @@ export default function RegisterForm({ onSuccess, onSwitchToLogin }: RegisterFor
           <div className="inline-flex items-center justify-center w-16 h-16 rounded-full bg-green-100 dark:bg-green-900/30 mb-4">
             <CheckCircle className="w-8 h-8 text-green-500" />
           </div>
-          <h2 className="text-2xl font-bold text-surface-900 dark:text-surface-100">
+          <h2 className="text-2xl font-bold text-gray-950 dark:text-surface-100">
             Registration Successful!
           </h2>
-          <p className="text-surface-600 dark:text-surface-400 mt-2">
+          <p className="text-gray-700 dark:text-gray-500 mt-2">
             Redirecting to login...
           </p>
         </div>
@@ -94,10 +94,10 @@ export default function RegisterForm({ onSuccess, onSwitchToLogin }: RegisterFor
           <div className="inline-flex items-center justify-center w-16 h-16 rounded-full bg-gradient-to-br from-primary-500 to-primary-600 mb-4">
             <UserPlus className="w-8 h-8 text-white" />
           </div>
-          <h2 className="text-2xl font-bold text-surface-900 dark:text-surface-100">
+          <h2 className="text-2xl font-bold text-gray-950 dark:text-surface-100">
             Create Account
           </h2>
-          <p className="text-surface-600 dark:text-surface-400 mt-2">
+          <p className="text-gray-700 dark:text-gray-500 mt-2">
             Join the team
           </p>
         </div>
@@ -115,11 +115,11 @@ export default function RegisterForm({ onSuccess, onSwitchToLogin }: RegisterFor
 
         <form onSubmit={handleSubmit} className="space-y-5">
           <div>
-            <label className="block text-sm font-medium text-surface-700 dark:text-surface-300 mb-2">
+            <label className="block text-sm font-medium text-gray-800 dark:text-surface-300 mb-2">
               Full Name
             </label>
             <div className="relative">
-              <User className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-surface-400" />
+              <User className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-500" />
               <input
                 type="text"
                 name="name"
@@ -131,7 +131,7 @@ export default function RegisterForm({ onSuccess, onSwitchToLogin }: RegisterFor
                   'w-full pl-10 pr-4 py-3 rounded-lg border transition-colors',
                   'bg-white dark:bg-surface-700',
                   'border-surface-200 dark:border-surface-600',
-                  'text-surface-900 dark:text-surface-100',
+                  'text-gray-950 dark:text-surface-100',
                   'placeholder-surface-400',
                   'focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent'
                 )}
@@ -140,11 +140,11 @@ export default function RegisterForm({ onSuccess, onSwitchToLogin }: RegisterFor
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-surface-700 dark:text-surface-300 mb-2">
+            <label className="block text-sm font-medium text-gray-800 dark:text-surface-300 mb-2">
               Email Address
             </label>
             <div className="relative">
-              <Mail className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-surface-400" />
+              <Mail className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-500" />
               <input
                 type="email"
                 name="email"
@@ -156,7 +156,7 @@ export default function RegisterForm({ onSuccess, onSwitchToLogin }: RegisterFor
                   'w-full pl-10 pr-4 py-3 rounded-lg border transition-colors',
                   'bg-white dark:bg-surface-700',
                   'border-surface-200 dark:border-surface-600',
-                  'text-surface-900 dark:text-surface-100',
+                  'text-gray-950 dark:text-surface-100',
                   'placeholder-surface-400',
                   'focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent'
                 )}
@@ -166,11 +166,11 @@ export default function RegisterForm({ onSuccess, onSwitchToLogin }: RegisterFor
 
           <div className="grid grid-cols-2 gap-4">
             <div>
-              <label className="block text-sm font-medium text-surface-700 dark:text-surface-300 mb-2">
+              <label className="block text-sm font-medium text-gray-800 dark:text-surface-300 mb-2">
                 Job Role
               </label>
               <div className="relative">
-                <Briefcase className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-surface-400" />
+                <Briefcase className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-500" />
                 <input
                   type="text"
                   name="role"
@@ -182,7 +182,7 @@ export default function RegisterForm({ onSuccess, onSwitchToLogin }: RegisterFor
                     'w-full pl-10 pr-4 py-3 rounded-lg border transition-colors',
                     'bg-white dark:bg-surface-700',
                     'border-surface-200 dark:border-surface-600',
-                    'text-surface-900 dark:text-surface-100',
+                    'text-gray-950 dark:text-surface-100',
                     'placeholder-surface-400',
                     'focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent'
                   )}
@@ -191,11 +191,11 @@ export default function RegisterForm({ onSuccess, onSwitchToLogin }: RegisterFor
             </div>
 
             <div>
-              <label className="block text-sm font-medium text-surface-700 dark:text-surface-300 mb-2">
+              <label className="block text-sm font-medium text-gray-800 dark:text-surface-300 mb-2">
                 Department
               </label>
               <div className="relative">
-                <Building2 className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-surface-400" />
+                <Building2 className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-500" />
                 <select
                   name="department"
                   value={formData.department}
@@ -205,7 +205,7 @@ export default function RegisterForm({ onSuccess, onSwitchToLogin }: RegisterFor
                     'w-full pl-10 pr-4 py-3 rounded-lg border transition-colors appearance-none',
                     'bg-white dark:bg-surface-700',
                     'border-surface-200 dark:border-surface-600',
-                    'text-surface-900 dark:text-surface-100',
+                    'text-gray-950 dark:text-surface-100',
                     'focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent'
                   )}
                 >
@@ -219,11 +219,11 @@ export default function RegisterForm({ onSuccess, onSwitchToLogin }: RegisterFor
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-surface-700 dark:text-surface-300 mb-2">
+            <label className="block text-sm font-medium text-gray-800 dark:text-surface-300 mb-2">
               Password
             </label>
             <div className="relative">
-              <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-surface-400" />
+              <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-500" />
               <input
                 type="password"
                 name="password"
@@ -236,7 +236,7 @@ export default function RegisterForm({ onSuccess, onSwitchToLogin }: RegisterFor
                   'w-full pl-10 pr-4 py-3 rounded-lg border transition-colors',
                   'bg-white dark:bg-surface-700',
                   'border-surface-200 dark:border-surface-600',
-                  'text-surface-900 dark:text-surface-100',
+                  'text-gray-950 dark:text-surface-100',
                   'placeholder-surface-400',
                   'focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent'
                 )}
@@ -245,11 +245,11 @@ export default function RegisterForm({ onSuccess, onSwitchToLogin }: RegisterFor
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-surface-700 dark:text-surface-300 mb-2">
+            <label className="block text-sm font-medium text-gray-800 dark:text-surface-300 mb-2">
               Confirm Password
             </label>
             <div className="relative">
-              <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-surface-400" />
+              <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-500" />
               <input
                 type="password"
                 name="confirmPassword"
@@ -262,7 +262,7 @@ export default function RegisterForm({ onSuccess, onSwitchToLogin }: RegisterFor
                   'w-full pl-10 pr-4 py-3 rounded-lg border transition-colors',
                   'bg-white dark:bg-surface-700',
                   'border-surface-200 dark:border-surface-600',
-                  'text-surface-900 dark:text-surface-100',
+                  'text-gray-950 dark:text-surface-100',
                   'placeholder-surface-400',
                   'focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent'
                 )}
@@ -298,7 +298,7 @@ export default function RegisterForm({ onSuccess, onSwitchToLogin }: RegisterFor
 
         {onSwitchToLogin && (
           <div className="mt-6 text-center">
-            <p className="text-surface-600 dark:text-surface-400">
+            <p className="text-gray-700 dark:text-gray-500">
               Already have an account?{' '}
               <button
                 onClick={onSwitchToLogin}

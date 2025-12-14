@@ -13,6 +13,28 @@ from rag.retriever import RAGRetriever, get_rag_retriever
 logger = logging.getLogger(__name__)
 settings = get_settings()
 
+# Arabic to English query translations for common IT topics
+ARABIC_QUERY_MAPPINGS = {
+    "كمبيوتر": "computer laptop device",
+    "حاسوب": "computer laptop device",
+    "لابتوب": "laptop device setup",
+    "بريد": "email setup outlook",
+    "إيميل": "email setup outlook",
+    "ايميل": "email setup outlook",
+    "كلمة مرور": "password reset authentication",
+    "كلمة السر": "password reset authentication",
+    "برنامج": "software application install",
+    "VPN": "VPN remote access",
+    "في بي ان": "VPN remote access",
+    "شبكة": "network wifi connection",
+    "واي فاي": "wifi network connection",
+    "حساب": "account setup login",
+    "تسجيل دخول": "login account access",
+    "طابعة": "printer setup",
+    "سلاك": "slack messaging",
+    "جيرا": "jira project tracking",
+}
+
 
 class ITAgent(BaseAgent):
     """Agent for handling IT-related questions."""
@@ -35,6 +57,7 @@ IMPORTANT RULES:
 2. If the question is not covered in the documents, say "I don't have specific information about that. Please contact IT Help Desk at it-helpdesk@company.com or extension 3000."
 3. For urgent IT issues, always mention the help desk contact.
 4. Be clear and provide step-by-step instructions when applicable.
+5. LANGUAGE: {language_instruction}
 
 User Information:
 - Name: {user_name}
@@ -47,7 +70,10 @@ CONTEXT DOCUMENTS:
 
     USER_PROMPT = """Question: {question}
 
-Please provide a helpful answer based on the IT policies above."""
+Please provide a helpful answer based on the IT policies above. {response_language}"""
+    
+    ARABIC_INSTRUCTION = "The user is asking in Arabic. You MUST respond in Arabic (العربية). Translate the relevant policy information to Arabic in your response."
+    ENGLISH_INSTRUCTION = "Respond in English."
     
     def __init__(self, retriever: RAGRetriever = None):
         """Initialize the IT agent.
@@ -69,6 +95,23 @@ Please provide a helpful answer based on the IT policies above."""
         
         self.chain = self.prompt | self.llm | StrOutputParser()
     
+    def _translate_arabic_query(self, query: str) -> str:
+        """Translate Arabic query keywords to English for better RAG retrieval."""
+        english_terms = []
+        query_lower = query.lower()
+        
+        for arabic_term, english_equiv in ARABIC_QUERY_MAPPINGS.items():
+            if arabic_term in query or arabic_term in query_lower:
+                english_terms.append(english_equiv)
+        
+        if english_terms:
+            translated = " ".join(english_terms)
+            logger.info(f"Translated Arabic query for RAG: '{query[:30]}...' -> '{translated}'")
+            return translated
+        
+        logger.warning(f"No Arabic terms matched for: {query[:50]}... Using generic IT search")
+        return "IT setup computer laptop email account VPN"
+    
     async def process(self, state: AgentState) -> AgentResponse:
         """Process IT-related query.
         
@@ -79,12 +122,19 @@ Please provide a helpful answer based on the IT policies above."""
             AgentResponse with IT information.
         """
         question = state.get("current_message", "")
+        is_arabic = state.get("is_arabic", False)
+        language = state.get("language", "en")
         
-        logger.info(f"IT Agent processing: {question[:50]}...")
+        logger.info(f"IT Agent processing: {question[:50]}... (language: {language})")
+        
+        # For Arabic queries, translate to English for better RAG retrieval
+        search_query = question
+        if is_arabic:
+            search_query = self._translate_arabic_query(question)
         
         # Retrieve relevant IT documents
         rag_response = self.retriever.answer(
-            question=question,
+            question=search_query,
             user_role=state.get("user_role", "Employee"),
             user_department=state.get("user_department", "General"),
             department_filter="IT"
@@ -93,13 +143,19 @@ Please provide a helpful answer based on the IT policies above."""
         # Format context from retrieval
         context = self.retriever.format_context(rag_response.retrieval_result)
         
+        # Set language instruction
+        language_instruction = self.ARABIC_INSTRUCTION if is_arabic else self.ENGLISH_INSTRUCTION
+        response_language = "Respond in Arabic (العربية)." if is_arabic else ""
+        
         # Generate response
         response = self.chain.invoke({
             "context": context,
             "question": question,
             "user_name": state.get("user_name", ""),
             "user_role": state.get("user_role", "Employee"),
-            "user_department": state.get("user_department", "General")
+            "user_department": state.get("user_department", "General"),
+            "language_instruction": language_instruction,
+            "response_language": response_language
         })
         
         return AgentResponse(
@@ -107,7 +163,8 @@ Please provide a helpful answer based on the IT policies above."""
             sources=rag_response.sources,
             metadata={
                 "retrieval_time_ms": rag_response.retrieval_result.retrieval_time_ms,
-                "docs_retrieved": len(rag_response.retrieval_result.documents)
+                "docs_retrieved": len(rag_response.retrieval_result.documents),
+                "language": language
             }
         )
 

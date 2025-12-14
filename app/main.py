@@ -10,6 +10,7 @@ from app.config import get_settings
 from app.database import engine, Base
 from app.api.routes import router
 from app.api.auth_routes import router as auth_router
+from app.api.feature_routes import router as feature_router
 from app.api.middleware import SecurityMiddleware, MetricsMiddleware
 from app.audit.middleware import AuditMiddleware
 
@@ -53,6 +54,61 @@ async def lifespan(app: FastAPI):
         logger.info("Hybrid search engine initialized")
     except Exception as e:
         logger.warning(f"Could not initialize hybrid search: {e}")
+    
+    # OPTIMIZATION: Preload ML router to avoid first-request latency
+    try:
+        from ml.router import get_router
+        router_model = get_router()
+        # Force load the model by accessing it
+        _ = router_model.model
+        logger.info("ML routing model preloaded")
+    except Exception as e:
+        logger.warning(f"Could not preload ML router: {e}")
+    
+    # OPTIMIZATION: Preload orchestrator and all agents
+    try:
+        from app.agents.orchestrator import get_orchestrator
+        orchestrator = get_orchestrator()
+        logger.info("Orchestrator and agents preloaded")
+    except Exception as e:
+        logger.warning(f"Could not preload orchestrator: {e}")
+    
+    # OPTIMIZATION: Preload embedding model
+    try:
+        from rag.embeddings import get_embedding_service
+        embedding_service = get_embedding_service()
+        # Force model load
+        _ = embedding_service.model
+        logger.info("Embedding model preloaded")
+    except Exception as e:
+        logger.warning(f"Could not preload embedding model: {e}")
+    
+    # Initialize feature services
+    try:
+        from app.database import SessionLocal
+        from app.services.achievements import AchievementService
+        from app.services.training import TrainingService
+        from app.services.workflows import initialize_default_workflows
+        
+        db = SessionLocal()
+        
+        # Initialize achievements
+        achievement_service = AchievementService(db)
+        achievement_service.initialize_achievements()
+        logger.info("Achievements initialized")
+        
+        # Initialize training modules
+        training_service = TrainingService(db)
+        training_service.initialize_modules()
+        logger.info("Training modules initialized")
+        
+        # Initialize workflows
+        initialize_default_workflows(db)
+        logger.info("Workflows initialized")
+        
+        db.close()
+    except Exception as e:
+        logger.warning(f"Could not initialize features: {e}")
     
     yield
     
@@ -123,6 +179,7 @@ app.add_middleware(AuditMiddleware)
 # Include API routes
 app.include_router(router, prefix="/api/v1")
 app.include_router(auth_router, prefix="/api/v1")
+app.include_router(feature_router, prefix="/api/v1")
 
 
 @app.get("/")
@@ -145,7 +202,19 @@ async def root():
             "Session management",
             "PII detection & redaction",
             "Comprehensive audit logging",
-            "Prometheus metrics"
+            "Prometheus metrics",
+            "Feedback system with thumbs up/down",
+            "Semantic caching for responses",
+            "Query rewriting (spell check, abbreviations)",
+            "Multi-intent detection",
+            "Confidence-based escalation",
+            "Multi-language (Arabic/English)",
+            "FAQ management portal",
+            "Achievement system (gamification)",
+            "Churn prediction (engagement-based)",
+            "Automated workflows",
+            "Interactive training modules",
+            "Calendar integration"
         ]
     }
 

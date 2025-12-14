@@ -21,6 +21,9 @@ from app.api.schemas import (
 from app.agents.orchestrator import get_orchestrator
 from app.services.security import redact_pii
 from app.monitoring import get_metrics_collector
+from app.services.achievements import AchievementService
+from app.auth.service import get_password_hash
+from app.audit.service import AuditLogger, AuditAction, AuditResource
 
 logger = logging.getLogger(__name__)
 settings = get_settings()
@@ -99,6 +102,7 @@ async def create_user(user: UserCreate, db: Session = Depends(get_db)):
     db_user = User(
         name=user.name,
         email=user.email,
+        password_hash=get_password_hash(user.password),
         role=user.role,
         department=user.department,
         user_type=UserRole(user.user_type.value),
@@ -199,20 +203,101 @@ async def update_task_status(
     db.commit()
     db.refresh(task)
     
+    # Check and unlock achievements when task is completed
+    if update.status == "DONE":
+        try:
+            achievement_service = AchievementService(db)
+            achievement_service.check_and_unlock(task.user_id)
+        except Exception as e:
+            logger.error(f"Failed to check achievements: {e}")
+    
     return task
+
+
+# Background task queue for non-blocking operations
+import asyncio
+from concurrent.futures import ThreadPoolExecutor
+
+_background_executor = ThreadPoolExecutor(max_workers=4)
+
+
+def _save_user_message_background(db_session_factory, user_id: int, request_message: str, result: dict):
+    """Save user message and routing log to DB in background thread.
+    
+    Note: Assistant message is saved synchronously to get message_id for feedback.
+    """
+    try:
+        from app.database import get_db
+        db = next(db_session_factory())
+        
+        redacted_message = redact_pii(request_message)
+        
+        # Save user message
+        user_message = Message(
+            user_id=user_id,
+            text=request_message,
+            text_redacted=redacted_message,
+            source="user"
+        )
+        db.add(user_message)
+        
+        # Save routing log
+        routing = result.get("routing", {})
+        routing_log = RoutingLog(
+            user_id=user_id,
+            query_text=request_message,
+            query_text_redacted=redacted_message,
+            predicted_department=routing.get("predicted_department", "General"),
+            prediction_confidence=routing.get("prediction_confidence", 0.0),
+            final_department=routing.get("final_department", "General"),
+            was_overridden=routing.get("was_overridden", False)
+        )
+        db.add(routing_log)
+        
+        db.commit()
+        db.close()
+    except Exception as e:
+        logger.error(f"Background user message save failed: {e}")
+
+
+def _check_achievements_background(db_session_factory, user_id: int):
+    """Check achievements in background thread."""
+    try:
+        from app.database import get_db
+        db = next(db_session_factory())
+        achievement_service = AchievementService(db)
+        achievement_service.check_and_unlock(user_id)
+        db.close()
+    except Exception as e:
+        logger.error(f"Background achievement check failed: {e}")
 
 
 # Chat endpoint
 @router.post("/chat", response_model=ChatResponse, tags=["Chat"])
 async def chat(request: ChatRequest, db: Session = Depends(get_db)):
-    """Main chat endpoint for the onboarding assistant."""
-    # Get user
+    """Main chat endpoint for the onboarding assistant (optimized)."""
+    # OPTIMIZATION: Single query with eager loading instead of multiple queries
     user = db.query(User).filter(User.id == request.user_id).first()
     if not user:
         raise HTTPException(status_code=404, detail="User not found")
     
-    # Get user tasks
-    tasks = db.query(Task).filter(Task.user_id == request.user_id).all()
+    # OPTIMIZATION: Run task and message queries in parallel using ThreadPoolExecutor
+    loop = asyncio.get_event_loop()
+    
+    def get_tasks():
+        return db.query(Task).filter(Task.user_id == request.user_id).all()
+    
+    def get_messages():
+        return db.query(Message).filter(
+            Message.user_id == request.user_id
+        ).order_by(Message.timestamp.desc()).limit(10).all()
+    
+    # Execute both queries concurrently
+    tasks_future = loop.run_in_executor(None, get_tasks)
+    messages_future = loop.run_in_executor(None, get_messages)
+    
+    tasks, recent_messages = await asyncio.gather(tasks_future, messages_future)
+    
     tasks_data = [
         {
             "id": t.id,
@@ -224,11 +309,6 @@ async def chat(request: ChatRequest, db: Session = Depends(get_db)):
         }
         for t in tasks
     ]
-    
-    # Get recent chat history
-    recent_messages = db.query(Message).filter(
-        Message.user_id == request.user_id
-    ).order_by(Message.timestamp.desc()).limit(10).all()
     
     chat_history = [
         {"role": "user" if m.source == "user" else "assistant", "content": m.text}
@@ -248,43 +328,7 @@ async def chat(request: ChatRequest, db: Session = Depends(get_db)):
         chat_history=chat_history
     )
     
-    # Save messages to database
-    redacted_message = redact_pii(request.message)
-    
-    user_message = Message(
-        user_id=user.id,
-        text=request.message,
-        text_redacted=redacted_message,
-        source="user"
-    )
-    db.add(user_message)
-    
-    assistant_message = Message(
-        user_id=user.id,
-        text=result["response"],
-        text_redacted=result["response"],  # Response shouldn't contain PII
-        source="assistant",
-        extra_data={
-            "agent": result.get("agent"),
-            "routing": result.get("routing")
-        }
-    )
-    db.add(assistant_message)
-    
-    # Log routing decision
-    routing = result.get("routing", {})
-    routing_log = RoutingLog(
-        user_id=user.id,
-        query_text=request.message,
-        query_text_redacted=redacted_message,
-        predicted_department=routing.get("predicted_department", "General"),
-        prediction_confidence=routing.get("prediction_confidence", 0.0),
-        final_department=routing.get("final_department", "General"),
-        was_overridden=routing.get("was_overridden", False)
-    )
-    db.add(routing_log)
-    
-    # Apply task updates if any
+    # Apply task updates synchronously (important for consistency)
     for task_update in result.get("task_updates", []):
         task_id = task_update.get("task_id")
         new_status = task_update.get("new_status")
@@ -295,7 +339,57 @@ async def chat(request: ChatRequest, db: Session = Depends(get_db)):
                 if new_status == "DONE":
                     task.completed_at = datetime.utcnow()
     
+    # Save assistant message SYNCHRONOUSLY to get the message_id for feedback
+    # This is required for the feedback system to work
+    assistant_message = Message(
+        user_id=user.id,
+        text=result["response"],
+        text_redacted=result["response"],
+        source="assistant",
+        extra_data={
+            "agent": result.get("agent"),
+            "routing": result.get("routing")
+        }
+    )
+    db.add(assistant_message)
     db.commit()
+    db.refresh(assistant_message)
+    
+    # Get the message_id for frontend feedback
+    saved_message_id = assistant_message.id
+    
+    # Save user message and routing log in background (non-blocking)
+    _background_executor.submit(
+        _save_user_message_background, 
+        get_db, user.id, request.message, result
+    )
+    # Check achievements in background
+    _background_executor.submit(
+        _check_achievements_background, 
+        get_db, user.id
+    )
+    
+    routing = result.get("routing", {})
+    
+    # Log chat to audit with full details (query, response, department, user)
+    audit_logger = AuditLogger(db)
+    audit_logger.log(
+        action=AuditAction.CHAT_SEND,
+        resource_type=AuditResource.MESSAGE,
+        resource_id=saved_message_id,
+        user_id=user.id,
+        user_email=user.email,
+        details={
+            "query": request.message[:500],  # Truncate long queries
+            "response": result["response"][:500],  # Truncate long responses
+            "department": routing.get("final_department", "General"),
+            "predicted_department": routing.get("predicted_department"),
+            "confidence": routing.get("prediction_confidence"),
+            "agent": result.get("agent"),
+            "duration_ms": result.get("total_time_ms", 0),
+        },
+        status="success"
+    )
     
     # Build response
     sources = [
@@ -306,6 +400,8 @@ async def chat(request: ChatRequest, db: Session = Depends(get_db)):
         )
         for s in result.get("sources", [])
     ]
+    
+    routing = result.get("routing", {})
     
     return ChatResponse(
         response=result["response"],
@@ -318,7 +414,8 @@ async def chat(request: ChatRequest, db: Session = Depends(get_db)):
             was_overridden=routing.get("was_overridden", False)
         ),
         agent=result.get("agent"),
-        total_time_ms=result.get("total_time_ms", 0)
+        total_time_ms=result.get("total_time_ms", 0),
+        message_id=saved_message_id  # Include message ID for feedback
     )
 
 

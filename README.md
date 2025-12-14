@@ -28,6 +28,16 @@ An AI-powered, multi-agent onboarding assistant that helps new employees navigat
 - **⏱️ Rate Limiting**: Tiered rate limits by user type (token bucket algorithm)
 - **📋 Audit Logging**: Comprehensive audit trail for all system actions
 
+### Enhanced Features (v1.4)
+- **🏆 Gamification**: Achievement system with points, badges, and leaderboard
+- **📚 Training Modules**: Interactive learning with quizzes and progress tracking
+- **📅 Calendar Integration**: Internal calendar with ICS export (Google/Outlook OAuth ready)
+- **🌍 Internationalization**: Full Arabic/English support with RTL layout
+- **🔮 Semantic Caching**: Reduces LLM calls by caching similar queries
+- **🎯 Multi-Intent Detection**: Handles queries spanning multiple departments
+- **📊 Churn Prediction**: Identifies at-risk users based on engagement
+- **⚡ Query Rewriting**: Spell correction and abbreviation expansion
+
 ### Technical Highlights
 - **Hybrid RAG Pipeline**: Semantic search + BM25 keyword search with Reciprocal Rank Fusion
 - **ML Routing**: TF-IDF + Logistic Regression classifier with MLflow tracking
@@ -107,6 +117,7 @@ onboardingAI_agents/
 │   ├── api/                      # FastAPI routes
 │   │   ├── routes.py             # Core API endpoints
 │   │   ├── auth_routes.py        # Authentication endpoints
+│   │   ├── feature_routes.py     # Enhanced feature endpoints
 │   │   ├── schemas.py            # Pydantic request/response models
 │   │   └── middleware.py         # Security & metrics middleware
 │   ├── auth/                     # Authentication module
@@ -126,6 +137,19 @@ onboardingAI_agents/
 │   │   ├── pii_detector.py       # PII detection & redaction
 │   │   └── rate_limiter.py       # Token bucket rate limiter
 │   ├── services/                 # Business services
+│   │   ├── achievements.py       # Gamification & achievements
+│   │   ├── training.py           # Training modules & quizzes
+│   │   ├── calendar_service.py   # Calendar events
+│   │   ├── feedback.py           # User feedback
+│   │   ├── faq_service.py        # FAQ management
+│   │   ├── semantic_cache.py     # Query caching
+│   │   ├── intent_detector.py    # Multi-intent detection
+│   │   ├── query_processor.py    # Query rewriting
+│   │   ├── churn_prediction.py   # Engagement-based churn
+│   │   ├── workflows.py          # Automated workflows
+│   │   ├── i18n.py               # Internationalization
+│   │   ├── escalation.py         # Confidence escalation
+│   │   ├── external_calendar_integration.py  # OAuth calendar (future)
 │   │   └── security.py           # Security helper functions
 │   ├── config.py                 # Application configuration
 │   └── main.py                   # FastAPI app entry point
@@ -152,10 +176,19 @@ onboardingAI_agents/
 │   │   │   ├── RegisterForm.tsx  # Registration form
 │   │   │   ├── ChatInterface.tsx # Chat UI with markdown
 │   │   │   ├── TaskList.tsx      # Task management UI
-│   │   │   └── AdminDashboard.tsx # Admin metrics dashboard
+│   │   │   ├── AdminDashboard.tsx # Admin metrics dashboard
+│   │   │   ├── AchievementsPanel.tsx # Gamification UI
+│   │   │   ├── TrainingModules.tsx # Training & quizzes
+│   │   │   ├── CalendarView.tsx  # Calendar management
+│   │   │   ├── FAQManagement.tsx # Admin FAQ CRUD
+│   │   │   ├── ChurnDashboard.tsx # At-risk users
+│   │   │   ├── AuditLogExplorer.tsx # Audit log viewer
+│   │   │   ├── FeedbackButtons.tsx # Thumbs up/down
+│   │   │   └── LanguageSwitcher.tsx # i18n language toggle
 │   │   └── lib/                  # Utilities
 │   │       ├── api.ts            # API client with auth
-│   │       └── auth-context.tsx  # React auth context
+│   │       ├── auth-context.tsx  # React auth context
+│   │       └── i18n-context.tsx  # Internationalization context
 │   ├── tailwind.config.js        # Tailwind configuration
 │   ├── package.json              # Node dependencies
 │   └── Dockerfile                # Frontend container
@@ -171,9 +204,13 @@ onboardingAI_agents/
 │   └── onboarding.db             # SQLite database (gitignored)
 ├── scripts/                      # Utility scripts
 │   ├── init_system.py            # System initialization
-│   └── evaluate_rag.py           # RAG evaluation runner
+│   ├── evaluate_rag.py           # RAG evaluation runner
+│   └── health_check.py           # System health validation
 ├── docs/                         # Documentation
-│   └── SYSTEM_DESIGN.md          # Detailed system design
+│   ├── SYSTEM_ARCHITECTURES.md   # Detailed architecture diagrams
+│   ├── FEATURES_AND_LIMITATIONS.md # Feature documentation
+│   ├── TECHNICAL_REPORT.md       # Comprehensive technical report
+│   └── SYSTEM_DESIGN.md          # System design overview
 ├── mlruns/                       # MLflow experiments (gitignored)
 ├── docker-compose.yml            # Docker orchestration
 ├── Dockerfile                    # Backend container
@@ -326,8 +363,12 @@ curl http://localhost:8000/api/v1/auth/me \
 ### Demo Credentials
 
 After running `init_system.py`:
-- **Email**: `alex.chen@company.com`
-- **Password**: `password123`
+
+| Role | Email | Password |
+|------|-------|----------|
+| Admin | `admin@company.com` | `admin123` |
+| New Hire | `alex.chen@company.com` | `password123` |
+| New Hire | `sarah.johnson@company.com` | `password123` |
 
 ## 📚 API Documentation
 
@@ -350,6 +391,23 @@ After running `init_system.py`:
 | `/api/v1/admin/users` | GET | Get all users progress | admin, hr_admin |
 | `/api/v1/admin/metrics` | GET | Get aggregate metrics | admin, manager |
 | `/api/v1/admin/audit` | GET | Get audit logs | admin, security_admin |
+
+### Feature Endpoints
+
+| Endpoint | Method | Description |
+|----------|--------|-------------|
+| `/api/v1/achievements` | GET | Get user achievements |
+| `/api/v1/achievements/leaderboard` | GET | Get points leaderboard |
+| `/api/v1/training/modules` | GET | Get training modules |
+| `/api/v1/training/modules/{id}/quiz` | POST | Submit quiz answers |
+| `/api/v1/calendar/events` | GET/POST | Manage calendar events |
+| `/api/v1/calendar/sync-tasks` | POST | Sync tasks to calendar |
+| `/api/v1/calendar/export.ics` | GET | Export ICS file |
+| `/api/v1/feedback` | POST | Submit response feedback |
+| `/api/v1/faqs` | GET/POST | Manage FAQs |
+| `/api/v1/churn/at-risk` | GET | Get at-risk users |
+| `/api/v1/i18n/{lang}` | GET | Get translations |
+| `/api/v1/audit/logs` | GET | Get audit logs |
 
 ### Chat Request Example
 ```json
@@ -381,6 +439,17 @@ Authorization: Bearer <access_token>
 ```
 
 ## 🧪 Testing & Evaluation
+
+### Run System Health Check
+```bash
+python scripts/health_check.py
+```
+
+This validates all system components:
+- Public endpoints (health, FAQs, i18n)
+- Authentication flow
+- Feature endpoints (achievements, training, calendar, etc.)
+- Admin endpoints (users, metrics, audit logs)
 
 ### Run RAG Evaluation
 ```bash
@@ -513,6 +582,33 @@ Training results are logged to MLflow with:
 | `DEBUG` | Enable debug mode | `true` |
 | `ACCESS_TOKEN_EXPIRE_MINUTES` | JWT access token TTL | `30` |
 | `REFRESH_TOKEN_EXPIRE_DAYS` | JWT refresh token TTL | `7` |
+
+### Optional: External Calendar Integration
+
+To enable Google/Outlook calendar sync, add these variables:
+
+```env
+# Google Calendar (optional)
+GOOGLE_CLIENT_ID=your_google_client_id
+GOOGLE_CLIENT_SECRET=your_google_client_secret
+GOOGLE_REDIRECT_URI=http://localhost:8000/api/v1/calendar/oauth/google/callback
+
+# Microsoft Outlook (optional)
+MICROSOFT_CLIENT_ID=your_microsoft_client_id
+MICROSOFT_CLIENT_SECRET=your_microsoft_client_secret
+MICROSOFT_REDIRECT_URI=http://localhost:8000/api/v1/calendar/oauth/microsoft/callback
+```
+
+Then uncomment the code in `app/services/external_calendar_integration.py`.
+
+## 📚 Documentation
+
+| Document | Description |
+|----------|-------------|
+| [TECHNICAL_REPORT.md](docs/TECHNICAL_REPORT.md) | Comprehensive technical report with full system details |
+| [SYSTEM_ARCHITECTURES.md](docs/SYSTEM_ARCHITECTURES.md) | Detailed architecture diagrams for all 17 systems |
+| [FEATURES_AND_LIMITATIONS.md](docs/FEATURES_AND_LIMITATIONS.md) | Complete feature list and known limitations |
+| [SYSTEM_DESIGN.md](docs/SYSTEM_DESIGN.md) | High-level system design overview |
 
 ## 📄 License
 

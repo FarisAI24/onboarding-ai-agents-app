@@ -131,11 +131,11 @@ export default function TaskList({ userId, refreshTrigger }: TaskListProps) {
       {/* Header with Progress */}
       <div className="p-6 border-b border-surface-200/50 dark:border-surface-700/50">
         <div className="flex items-center justify-between mb-4">
-          <h2 className="text-xl font-semibold text-surface-900 dark:text-surface-100">
+          <h2 className="text-xl font-semibold text-gray-950 dark:text-surface-100">
             Onboarding Tasks
           </h2>
           <div className="flex items-center gap-2 text-sm">
-            <span className="text-surface-600 dark:text-surface-400">
+            <span className="text-gray-700 dark:text-gray-500">
               {completedTasks}/{totalTasks} completed
             </span>
             {overdueTasks > 0 && (
@@ -156,7 +156,7 @@ export default function TaskList({ userId, refreshTrigger }: TaskListProps) {
             className="absolute inset-y-0 left-0 bg-gradient-to-r from-primary-500 to-accent-500 rounded-full"
           />
         </div>
-        <p className="text-sm text-surface-500 mt-2">
+        <p className="text-sm text-gray-600 mt-2">
           {progressPercent.toFixed(0)}% complete
         </p>
 
@@ -170,8 +170,8 @@ export default function TaskList({ userId, refreshTrigger }: TaskListProps) {
                 className={clsx(
                   'px-3 py-1 text-sm rounded-md transition-colors capitalize',
                   filter === f
-                    ? 'bg-white dark:bg-surface-600 shadow text-surface-900 dark:text-surface-100'
-                    : 'text-surface-500 hover:text-surface-700 dark:hover:text-surface-300'
+                    ? 'bg-white dark:bg-surface-600 shadow text-gray-950 dark:text-surface-100'
+                    : 'text-gray-600 hover:text-gray-800 dark:hover:text-surface-300'
                 )}
               >
                 {f}
@@ -190,8 +190,8 @@ export default function TaskList({ userId, refreshTrigger }: TaskListProps) {
                 className={clsx(
                   'px-3 py-1 text-sm rounded-md transition-colors flex items-center gap-1',
                   timeline === t.value
-                    ? 'bg-white dark:bg-surface-600 shadow text-surface-900 dark:text-surface-100'
-                    : 'text-surface-500 hover:text-surface-700 dark:hover:text-surface-300'
+                    ? 'bg-white dark:bg-surface-600 shadow text-gray-950 dark:text-surface-100'
+                    : 'text-gray-600 hover:text-gray-800 dark:hover:text-surface-300'
                 )}
               >
                 <Calendar className="w-3 h-3" />
@@ -220,16 +220,16 @@ export default function TaskList({ userId, refreshTrigger }: TaskListProps) {
                 >
                   {departmentIcons[dept] || <Building2 className="w-4 h-4" />}
                 </div>
-                <span className="font-medium text-surface-800 dark:text-surface-200">
+                <span className="font-medium text-gray-900 dark:text-surface-200">
                   {dept}
                 </span>
-                <span className="text-sm text-surface-500">
+                <span className="text-sm text-gray-600">
                   {deptTasks.filter((t) => t.status === 'DONE').length}/{deptTasks.length}
                 </span>
               </div>
               <ChevronDown
                 className={clsx(
-                  'w-5 h-5 text-surface-400 transition-transform',
+                  'w-5 h-5 text-gray-500 transition-transform',
                   expandedDept === dept && 'rotate-180'
                 )}
               />
@@ -262,7 +262,7 @@ export default function TaskList({ userId, refreshTrigger }: TaskListProps) {
       </div>
 
       {filteredTasks.length === 0 && (
-        <div className="p-8 text-center text-surface-500">
+        <div className="p-8 text-center text-gray-600">
           No tasks found for the selected filters.
         </div>
       )}
@@ -306,7 +306,7 @@ function TaskItem({ task, onStatusChange }: TaskItemProps) {
         ) : task.status === 'IN_PROGRESS' ? (
           <Clock className="w-5 h-5 text-amber-500" />
         ) : (
-          <Circle className="w-5 h-5 text-surface-400 hover:text-primary-500 transition-colors" />
+          <Circle className="w-5 h-5 text-gray-500 hover:text-primary-500 transition-colors" />
         )}
       </button>
 
@@ -315,14 +315,14 @@ function TaskItem({ task, onStatusChange }: TaskItemProps) {
           className={clsx(
             'text-sm font-medium',
             task.status === 'DONE'
-              ? 'text-surface-500 line-through'
-              : 'text-surface-800 dark:text-surface-200'
+              ? 'text-gray-600 line-through'
+              : 'text-gray-900 dark:text-surface-200'
           )}
         >
           {task.title}
         </p>
         {task.description && (
-          <p className="text-xs text-surface-500 mt-0.5 truncate">
+          <p className="text-xs text-gray-600 mt-0.5 truncate">
             {task.description}
           </p>
         )}
@@ -338,7 +338,7 @@ function TaskItem({ task, onStatusChange }: TaskItemProps) {
           <span
             className={clsx(
               'text-xs flex items-center gap-1',
-              task.is_overdue ? 'text-red-500' : 'text-surface-400'
+              task.is_overdue ? 'text-red-500' : 'text-gray-500'
             )}
           >
             <Calendar className="w-3 h-3" />

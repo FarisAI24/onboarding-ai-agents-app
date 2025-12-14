@@ -1,9 +1,11 @@
 """Embedding service using HuggingFace sentence-transformers."""
 import logging
-from typing import List
+import hashlib
+from typing import List, Dict, Optional
 from functools import lru_cache
 
 from sentence_transformers import SentenceTransformer
+from cachetools import LRUCache
 import numpy as np
 
 from app.config import get_settings
@@ -12,7 +14,12 @@ logger = logging.getLogger(__name__)
 
 
 class EmbeddingService:
-    """Service for generating embeddings using HuggingFace models."""
+    """Service for generating embeddings using HuggingFace models with caching."""
+    
+    # Class-level embedding cache (shared across instances)
+    _embedding_cache: Dict[str, List[float]] = LRUCache(maxsize=10000)
+    _cache_hits = 0
+    _cache_misses = 0
     
     def __init__(self, model_name: str = None):
         """Initialize the embedding service.
@@ -38,17 +45,46 @@ class EmbeddingService:
         """Get the embedding dimension."""
         return self.model.get_sentence_embedding_dimension()
     
-    def embed_text(self, text: str) -> List[float]:
-        """Generate embedding for a single text.
+    def _get_cache_key(self, text: str) -> str:
+        """Generate cache key for text."""
+        normalized = text.lower().strip()
+        return hashlib.md5(normalized.encode()).hexdigest()
+    
+    def embed_text(self, text: str, use_cache: bool = True) -> List[float]:
+        """Generate embedding for a single text with caching.
         
         Args:
             text: Input text to embed.
+            use_cache: Whether to use embedding cache.
             
         Returns:
             List of floats representing the embedding.
         """
+        if use_cache:
+            cache_key = self._get_cache_key(text)
+            if cache_key in self._embedding_cache:
+                EmbeddingService._cache_hits += 1
+                return self._embedding_cache[cache_key]
+            EmbeddingService._cache_misses += 1
+        
         embedding = self.model.encode(text, convert_to_numpy=True)
-        return embedding.tolist()
+        result = embedding.tolist()
+        
+        if use_cache:
+            self._embedding_cache[cache_key] = result
+        
+        return result
+    
+    def get_cache_stats(self) -> Dict[str, any]:
+        """Get embedding cache statistics."""
+        total = self._cache_hits + self._cache_misses
+        hit_rate = self._cache_hits / max(1, total)
+        return {
+            "cache_size": len(self._embedding_cache),
+            "cache_hits": self._cache_hits,
+            "cache_misses": self._cache_misses,
+            "hit_rate": round(hit_rate, 3)
+        }
     
     def embed_texts(self, texts: List[str], batch_size: int = 32) -> List[List[float]]:
         """Generate embeddings for multiple texts.

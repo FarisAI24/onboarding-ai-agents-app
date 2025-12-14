@@ -1,9 +1,11 @@
 """Hybrid search combining semantic and keyword-based retrieval."""
 import logging
 import re
+import asyncio
 from typing import List, Dict, Any, Tuple, Optional
 from dataclasses import dataclass, field
 from collections import defaultdict
+from concurrent.futures import ThreadPoolExecutor
 import time
 import hashlib
 
@@ -12,6 +14,9 @@ from cachetools import TTLCache
 import numpy as np
 
 logger = logging.getLogger(__name__)
+
+# Thread pool for parallel search execution
+_search_executor = ThreadPoolExecutor(max_workers=4)
 
 
 @dataclass
@@ -137,7 +142,12 @@ class BM25Index:
 
 
 class HybridSearchEngine:
-    """Hybrid search engine combining semantic and BM25 retrieval."""
+    """Hybrid search engine combining semantic and BM25 retrieval with parallel execution."""
+    
+    # Optimized defaults for faster retrieval
+    DEFAULT_CACHE_TTL = 1800  # 30 minutes (was 5 minutes)
+    DEFAULT_CACHE_SIZE = 5000  # 5000 entries (was 1000)
+    FETCH_MULTIPLIER = 1.5  # Fetch 1.5x for fusion (was 2x)
     
     def __init__(
         self,
@@ -145,8 +155,8 @@ class HybridSearchEngine:
         bm25_index: BM25Index = None,
         semantic_weight: float = 0.7,
         bm25_weight: float = 0.3,
-        cache_ttl: int = 300,
-        cache_maxsize: int = 1000
+        cache_ttl: int = None,
+        cache_maxsize: int = None
     ):
         """Initialize the hybrid search engine.
         
@@ -155,16 +165,19 @@ class HybridSearchEngine:
             bm25_index: BM25 index for keyword search.
             semantic_weight: Weight for semantic scores (0-1).
             bm25_weight: Weight for BM25 scores (0-1).
-            cache_ttl: Cache TTL in seconds.
-            cache_maxsize: Maximum cache size.
+            cache_ttl: Cache TTL in seconds (default: 30 minutes).
+            cache_maxsize: Maximum cache size (default: 5000).
         """
         self.vectorstore = vectorstore
         self.bm25_index = bm25_index or BM25Index()
         self.semantic_weight = semantic_weight
         self.bm25_weight = bm25_weight
         
-        # Query cache
-        self._cache = TTLCache(maxsize=cache_maxsize, ttl=cache_ttl)
+        # Optimized query cache with longer TTL
+        self._cache = TTLCache(
+            maxsize=cache_maxsize or self.DEFAULT_CACHE_SIZE, 
+            ttl=cache_ttl or self.DEFAULT_CACHE_TTL
+        )
         
         # Metrics
         self.metrics = {
@@ -172,7 +185,8 @@ class HybridSearchEngine:
             "cache_hits": 0,
             "avg_semantic_time_ms": 0,
             "avg_bm25_time_ms": 0,
-            "avg_total_time_ms": 0
+            "avg_total_time_ms": 0,
+            "parallel_speedup_ms": 0  # Track parallel execution savings
         }
     
     def _get_cache_key(self, query: str, department: str, n_results: int) -> str:
@@ -209,6 +223,22 @@ class HybridSearchEngine:
         
         return [(s - min_score) / (max_score - min_score) for s in scores]
     
+    def _semantic_search(self, query: str, n_results: int, department_filter: str = None):
+        """Execute semantic search (for parallel execution)."""
+        return self.vectorstore.query(
+            query_text=query,
+            n_results=n_results,
+            where={"department": department_filter} if department_filter else None
+        )
+    
+    def _bm25_search(self, query: str, n_results: int, department_filter: str = None):
+        """Execute BM25 search (for parallel execution)."""
+        return self.bm25_index.search(
+            query=query,
+            n_results=n_results,
+            department_filter=department_filter
+        )
+    
     def search(
         self,
         query: str,
@@ -216,7 +246,7 @@ class HybridSearchEngine:
         department_filter: str = None,
         use_cache: bool = True
     ) -> HybridSearchResponse:
-        """Perform hybrid search.
+        """Perform hybrid search with parallel semantic and BM25 execution.
         
         Args:
             query: Query text.
@@ -230,7 +260,7 @@ class HybridSearchEngine:
         start_time = time.time()
         self.metrics["total_queries"] += 1
         
-        # Check cache
+        # Check cache first (fastest path)
         cache_key = self._get_cache_key(query, department_filter, n_results)
         if use_cache and cache_key in self._cache:
             self.metrics["cache_hits"] += 1
@@ -238,23 +268,35 @@ class HybridSearchEngine:
             cached.cache_hit = True
             return cached
         
-        # Step 1: Semantic search
-        semantic_start = time.time()
-        semantic_results = self.vectorstore.query(
-            query_text=query,
-            n_results=n_results * 2,  # Get more for fusion
-            where={"department": department_filter} if department_filter else None
-        )
-        semantic_time = (time.time() - semantic_start) * 1000
+        # Calculate fetch count (optimized from 2x to 1.5x)
+        fetch_count = int(n_results * self.FETCH_MULTIPLIER)
         
-        # Step 2: BM25 search
-        bm25_start = time.time()
-        bm25_results = self.bm25_index.search(
-            query=query,
-            n_results=n_results * 2,
-            department_filter=department_filter
+        # PARALLEL EXECUTION: Run semantic and BM25 search concurrently
+        parallel_start = time.time()
+        
+        # Submit both searches to thread pool
+        semantic_future = _search_executor.submit(
+            self._semantic_search, query, fetch_count, department_filter
         )
-        bm25_time = (time.time() - bm25_start) * 1000
+        bm25_future = _search_executor.submit(
+            self._bm25_search, query, fetch_count, department_filter
+        )
+        
+        # Wait for both to complete
+        semantic_results = semantic_future.result()
+        semantic_time = (time.time() - parallel_start) * 1000
+        
+        bm25_results = bm25_future.result()
+        bm25_time = (time.time() - parallel_start) * 1000  # Total time for BM25 (overlapped)
+        
+        # Calculate parallel speedup (vs sequential)
+        sequential_estimate = semantic_time + (bm25_time - semantic_time if bm25_time > semantic_time else 0)
+        parallel_time = max(semantic_time, bm25_time)
+        speedup = sequential_estimate - parallel_time
+        self.metrics["parallel_speedup_ms"] = (
+            (self.metrics["parallel_speedup_ms"] * (self.metrics["total_queries"] - 1) + speedup) 
+            / self.metrics["total_queries"]
+        )
         
         # Step 3: Fuse results using Reciprocal Rank Fusion (RRF)
         rerank_start = time.time()

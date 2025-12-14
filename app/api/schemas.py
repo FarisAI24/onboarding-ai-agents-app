@@ -36,6 +36,7 @@ class UserBase(BaseModel):
 
 
 class UserCreate(UserBase):
+    password: str  # Plain password, will be hashed
     user_type: UserType = UserType.NEW_HIRE
     start_date: Optional[date] = None
 
@@ -115,6 +116,7 @@ class ChatResponse(BaseModel):
     routing: RoutingInfo
     agent: Optional[str] = None
     total_time_ms: float = 0
+    message_id: Optional[int] = None  # ID of the saved assistant message for feedback
 
 
 # Message schemas

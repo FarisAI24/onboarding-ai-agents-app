@@ -28,6 +28,10 @@ class AgentState(TypedDict, total=False):
     current_message: str  # Current user message
     conversation_context: str  # Summarized context from recent messages
     
+    # Language
+    language: str  # Detected language ("en" or "ar")
+    is_arabic: bool  # Whether query is in Arabic
+    
     # Routing
     predicted_department: str
     prediction_confidence: float

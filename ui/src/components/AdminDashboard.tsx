@@ -104,7 +104,7 @@ export default function AdminDashboard() {
 
   if (!metrics) {
     return (
-      <div className="text-center text-surface-500 py-8">
+      <div className="text-center text-gray-600 py-8">
         Failed to load metrics. Please try again.
       </div>
     );
@@ -115,10 +115,10 @@ export default function AdminDashboard() {
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-bold text-surface-900 dark:text-surface-100">
+          <h1 className="text-2xl font-bold text-gray-950 dark:text-surface-100">
             Admin Dashboard
           </h1>
-          <p className="text-surface-500 mt-1">
+          <p className="text-gray-600 mt-1">
             Monitor onboarding progress and system health
             {lastUpdated && (
               <span className="ml-2 text-xs">
@@ -128,7 +128,7 @@ export default function AdminDashboard() {
           </p>
         </div>
         <div className="flex items-center gap-3">
-          <label className="flex items-center gap-2 text-sm text-surface-600 dark:text-surface-400">
+          <label className="flex items-center gap-2 text-sm text-gray-700 dark:text-gray-500">
             <input
               type="checkbox"
               checked={autoRefresh}
@@ -224,7 +224,7 @@ export default function AdminDashboard() {
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {/* Queries by Department */}
         <div className="bg-white/60 dark:bg-surface-800/60 backdrop-blur-lg rounded-2xl shadow-xl border border-surface-200/50 dark:border-surface-700/50 p-6">
-          <h3 className="text-lg font-semibold text-surface-900 dark:text-surface-100 mb-4 flex items-center gap-2">
+          <h3 className="text-lg font-semibold text-gray-950 dark:text-surface-100 mb-4 flex items-center gap-2">
             <MessageSquare className="w-5 h-5 text-primary-500" />
             Queries by Department
           </h3>
@@ -235,8 +235,8 @@ export default function AdminDashboard() {
               return (
                 <div key={dept}>
                   <div className="flex justify-between text-sm mb-1">
-                    <span className="text-surface-600 dark:text-surface-400">{dept}</span>
-                    <span className="text-surface-900 dark:text-surface-100 font-medium">
+                    <span className="text-gray-700 dark:text-gray-500">{dept}</span>
+                    <span className="text-gray-950 dark:text-surface-100 font-medium">
                       {count} ({percent.toFixed(0)}%)
                     </span>
                   </div>
@@ -252,14 +252,14 @@ export default function AdminDashboard() {
               );
             })}
           </div>
-          <p className="text-sm text-surface-500 mt-4">
+          <p className="text-sm text-gray-600 mt-4">
             {metrics.total_queries_today} queries today
           </p>
         </div>
 
         {/* Completion by Department */}
         <div className="bg-white/60 dark:bg-surface-800/60 backdrop-blur-lg rounded-2xl shadow-xl border border-surface-200/50 dark:border-surface-700/50 p-6">
-          <h3 className="text-lg font-semibold text-surface-900 dark:text-surface-100 mb-4 flex items-center gap-2">
+          <h3 className="text-lg font-semibold text-gray-950 dark:text-surface-100 mb-4 flex items-center gap-2">
             <BarChart3 className="w-5 h-5 text-primary-500" />
             Completion by Department
           </h3>
@@ -267,8 +267,8 @@ export default function AdminDashboard() {
             {Object.entries(metrics.completion_by_department).map(([dept, percent]) => (
               <div key={dept}>
                 <div className="flex justify-between text-sm mb-1">
-                  <span className="text-surface-600 dark:text-surface-400">{dept}</span>
-                  <span className="text-surface-900 dark:text-surface-100 font-medium">
+                  <span className="text-gray-700 dark:text-gray-500">{dept}</span>
+                  <span className="text-gray-950 dark:text-surface-100 font-medium">
                     {percent.toFixed(0)}%
                   </span>
                 </div>
@@ -297,8 +297,8 @@ export default function AdminDashboard() {
               <Shield className="w-5 h-5" />
             </div>
             <div>
-              <h4 className="font-semibold text-surface-900 dark:text-surface-100">Security</h4>
-              <p className="text-xs text-surface-500">PII Protection Active</p>
+              <h4 className="font-semibold text-gray-950 dark:text-surface-100">Security</h4>
+              <p className="text-xs text-gray-600">PII Protection Active</p>
             </div>
           </div>
           <div className="text-2xl font-bold text-emerald-600 dark:text-emerald-400">
@@ -312,8 +312,8 @@ export default function AdminDashboard() {
               <Zap className="w-5 h-5" />
             </div>
             <div>
-              <h4 className="font-semibold text-surface-900 dark:text-surface-100">AI Routing</h4>
-              <p className="text-xs text-surface-500">ML Model Active</p>
+              <h4 className="font-semibold text-gray-950 dark:text-surface-100">AI Routing</h4>
+              <p className="text-xs text-gray-600">ML Model Active</p>
             </div>
           </div>
           <div className="text-2xl font-bold text-blue-600 dark:text-blue-400">
@@ -327,8 +327,8 @@ export default function AdminDashboard() {
               <Activity className="w-5 h-5" />
             </div>
             <div>
-              <h4 className="font-semibold text-surface-900 dark:text-surface-100">RAG System</h4>
-              <p className="text-xs text-surface-500">Hybrid Search Active</p>
+              <h4 className="font-semibold text-gray-950 dark:text-surface-100">RAG System</h4>
+              <p className="text-xs text-gray-600">Hybrid Search Active</p>
             </div>
           </div>
           <div className="text-2xl font-bold text-purple-600 dark:text-purple-400">
@@ -340,10 +340,10 @@ export default function AdminDashboard() {
       {/* Users Table */}
       <div className="bg-white/60 dark:bg-surface-800/60 backdrop-blur-lg rounded-2xl shadow-xl border border-surface-200/50 dark:border-surface-700/50 overflow-hidden">
         <div className="p-6 border-b border-surface-200/50 dark:border-surface-700/50">
-          <h3 className="text-lg font-semibold text-surface-900 dark:text-surface-100 flex items-center gap-2">
+          <h3 className="text-lg font-semibold text-gray-950 dark:text-surface-100 flex items-center gap-2">
             <Users className="w-5 h-5 text-primary-500" />
             New Hire Progress
-            <span className="ml-2 text-sm font-normal text-surface-500">
+            <span className="ml-2 text-sm font-normal text-gray-600">
               ({users.length} employees)
             </span>
           </h3>
@@ -352,22 +352,22 @@ export default function AdminDashboard() {
           <table className="w-full">
             <thead className="bg-surface-50 dark:bg-surface-700/50">
               <tr>
-                <th className="text-left px-6 py-3 text-xs font-medium text-surface-500 uppercase tracking-wider">
+                <th className="text-left px-6 py-3 text-xs font-medium text-gray-600 uppercase tracking-wider">
                   Employee
                 </th>
-                <th className="text-left px-6 py-3 text-xs font-medium text-surface-500 uppercase tracking-wider">
+                <th className="text-left px-6 py-3 text-xs font-medium text-gray-600 uppercase tracking-wider">
                   Role
                 </th>
-                <th className="text-left px-6 py-3 text-xs font-medium text-surface-500 uppercase tracking-wider">
+                <th className="text-left px-6 py-3 text-xs font-medium text-gray-600 uppercase tracking-wider">
                   Department
                 </th>
-                <th className="text-left px-6 py-3 text-xs font-medium text-surface-500 uppercase tracking-wider">
+                <th className="text-left px-6 py-3 text-xs font-medium text-gray-600 uppercase tracking-wider">
                   Days
                 </th>
-                <th className="text-left px-6 py-3 text-xs font-medium text-surface-500 uppercase tracking-wider">
+                <th className="text-left px-6 py-3 text-xs font-medium text-gray-600 uppercase tracking-wider">
                   Progress
                 </th>
-                <th className="text-left px-6 py-3 text-xs font-medium text-surface-500 uppercase tracking-wider">
+                <th className="text-left px-6 py-3 text-xs font-medium text-gray-600 uppercase tracking-wider">
                   Status
                 </th>
               </tr>
@@ -378,22 +378,22 @@ export default function AdminDashboard() {
                   <td className="px-6 py-4">
                     <div className="flex items-center gap-3">
                       <div className="w-8 h-8 rounded-full bg-gradient-to-br from-primary-400 to-accent-400 flex items-center justify-center text-white text-sm font-medium">
-                        {user.user_name.charAt(0)}
+                        {user.user_name?.charAt(0) || '?'}
                       </div>
-                      <span className="font-medium text-surface-900 dark:text-surface-100">
+                      <span className="font-medium text-gray-950 dark:text-surface-100">
                         {user.user_name}
                       </span>
                     </div>
                   </td>
-                  <td className="px-6 py-4 text-sm text-surface-600 dark:text-surface-400">
+                  <td className="px-6 py-4 text-sm text-gray-700 dark:text-gray-500">
                     {user.role}
                   </td>
                   <td className="px-6 py-4">
-                    <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-surface-100 dark:bg-surface-700 text-surface-700 dark:text-surface-300">
+                    <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-surface-100 dark:bg-surface-700 text-gray-800 dark:text-surface-300">
                       {user.department}
                     </span>
                   </td>
-                  <td className="px-6 py-4 text-sm text-surface-600 dark:text-surface-400">
+                  <td className="px-6 py-4 text-sm text-gray-700 dark:text-gray-500">
                     {user.days_since_start}
                   </td>
                   <td className="px-6 py-4">
@@ -413,7 +413,7 @@ export default function AdminDashboard() {
                           )}
                         />
                       </div>
-                      <span className="text-sm text-surface-600 dark:text-surface-400 w-12">
+                      <span className="text-sm text-gray-700 dark:text-gray-500 w-12">
                         {user.progress_percentage.toFixed(0)}%
                       </span>
                     </div>
@@ -442,7 +442,7 @@ export default function AdminDashboard() {
           </table>
         </div>
         {users.length === 0 && (
-          <div className="text-center text-surface-500 py-8">
+          <div className="text-center text-gray-600 py-8">
             No new hires found.
           </div>
         )}
@@ -471,10 +471,10 @@ function MetricCard({ icon, label, value, color, subtitle }: MetricCardProps) {
           {icon}
         </div>
         <div>
-          <p className="text-sm text-surface-500 dark:text-surface-400">{label}</p>
-          <p className="text-2xl font-bold text-surface-900 dark:text-surface-100">{value}</p>
+          <p className="text-sm text-gray-600 dark:text-gray-500">{label}</p>
+          <p className="text-2xl font-bold text-gray-950 dark:text-surface-100">{value}</p>
           {subtitle && (
-            <p className="text-xs text-surface-400">{subtitle}</p>
+            <p className="text-xs text-gray-500">{subtitle}</p>
           )}
         </div>
       </div>

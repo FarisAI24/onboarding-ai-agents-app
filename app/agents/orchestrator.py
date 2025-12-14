@@ -1,6 +1,7 @@
 """Main orchestrator using LangGraph for multi-agent coordination."""
 import logging
 import time
+import asyncio
 from typing import Dict, Any, List, Optional
 from datetime import datetime
 
@@ -13,6 +14,10 @@ from app.agents.it_agent import ITAgent
 from app.agents.security_agent import SecurityAgent
 from app.agents.finance_agent import FinanceAgent
 from app.agents.progress_agent import ProgressAgent
+from app.services.intent_detector import get_intent_detector
+from app.database import get_db
+from app.services.semantic_cache import SemanticCacheService
+from app.services.i18n import get_translation_service
 
 logger = logging.getLogger(__name__)
 
@@ -240,6 +245,164 @@ class OnboardingOrchestrator:
         
         return state
     
+    async def _process_single_agent(
+        self,
+        department: str,
+        state: AgentState
+    ) -> Dict[str, Any]:
+        """Process a query through a single agent.
+        
+        Args:
+            department: Department to query.
+            state: Current state.
+            
+        Returns:
+            Agent response with content and sources.
+        """
+        agent = self.agent_map.get(department, self.progress_agent)
+        response = await agent.process(state)
+        return {
+            "department": department,
+            "content": response.content,
+            "sources": response.sources,
+            "task_updates": getattr(response, 'task_updates', [])
+        }
+    
+    def _detect_multiple_departments(self, message: str) -> List[str]:
+        """Detect if query spans multiple departments.
+        
+        Args:
+            message: User message.
+            
+        Returns:
+            List of detected departments.
+        """
+        intent_detector = get_intent_detector()
+        intent_result = intent_detector.detect(message)
+        
+        departments = []
+        
+        # Get primary intent's department
+        if intent_result.primary_intent.department:
+            departments.append(intent_result.primary_intent.department)
+        
+        # Check secondary intents for additional departments
+        for secondary in intent_result.secondary_intents:
+            if secondary.department and secondary.department not in departments:
+                departments.append(secondary.department)
+        
+        # Also check for department keywords directly in the message (English and Arabic)
+        message_lower = message.lower()
+        dept_keywords = {
+            "HR": [
+                # English
+                "benefit", "insurance", "health", "pto", "vacation", "leave", "policy", "handbook",
+                # Arabic
+                "تأمين", "تامين", "صحي", "إجازة", "اجازة", "مزايا", "موارد بشرية", "سياسة", "عقد"
+            ],
+            "IT": [
+                # English
+                "vpn", "laptop", "email", "password", "software", "account", "computer", "network",
+                # Arabic
+                "كمبيوتر", "حاسوب", "لابتوب", "بريد", "إيميل", "ايميل", "كلمة مرور", "كلمة السر", "برنامج"
+            ],
+            "Security": [
+                # English
+                "security", "training", "compliance", "badge", "nda",
+                # Arabic
+                "أمن", "امن", "تدريب", "بطاقة", "سرية"
+            ],
+            "Finance": [
+                # English
+                "expense", "payroll", "reimburse", "tax", "budget", "travel",
+                # Arabic
+                "راتب", "رواتب", "مصاريف", "نفقات", "ضريبة", "ميزانية", "سفر"
+            ]
+        }
+        
+        for dept, keywords in dept_keywords.items():
+            if dept not in departments:
+                for kw in keywords:
+                    if kw in message_lower or kw in message:  # Check both lower and original for Arabic
+                        departments.append(dept)
+                        break
+        
+        return departments if departments else ["General"]
+    
+    async def _combine_multi_agent_responses(
+        self,
+        responses: List[Dict[str, Any]],
+        user_name: str,
+        original_message: str
+    ) -> str:
+        """Combine responses from multiple agents into a coherent reply.
+        
+        Args:
+            responses: List of agent responses.
+            user_name: User's name.
+            original_message: Original user query.
+            
+        Returns:
+            Combined response text.
+        """
+        if len(responses) == 1:
+            return responses[0]["content"]
+        
+        # Build combined response with clear sections
+        combined_parts = []
+        
+        for resp in responses:
+            dept = resp["department"]
+            content = resp["content"]
+            
+            # Clean up the response (remove greetings if not the first)
+            if combined_parts:
+                # Remove common greeting patterns from subsequent responses
+                import re
+                content = re.sub(r'^(Hi|Hello|Hey)[^.!]*[.!]\s*', '', content, flags=re.IGNORECASE)
+                content = re.sub(r'^I\'d be happy to help[^.!]*[.!]\s*', '', content, flags=re.IGNORECASE)
+            
+            if content.strip():
+                combined_parts.append(f"**{dept} Information:**\n{content.strip()}")
+        
+        # Join with separators
+        combined = "\n\n---\n\n".join(combined_parts)
+        
+        return combined
+    
+    def _cache_response(
+        self,
+        query: str,
+        response: str,
+        sources: List[Dict],
+        department: str,
+        confidence: float
+    ):
+        """Cache a response for future similar queries (non-blocking)."""
+        # OPTIMIZATION: Run caching in background thread to not block response
+        from concurrent.futures import ThreadPoolExecutor
+        
+        def cache_in_background():
+            try:
+                db = next(get_db())
+                cache_service = SemanticCacheService(db)
+                cache_service.cache_response(
+                    query=query,
+                    response=response,
+                    sources=sources,
+                    department=department,
+                    confidence_score=confidence
+                )
+                db.close()
+                logger.debug(f"Cached response for query: {query[:50]}...")
+            except Exception as e:
+                logger.warning(f"Failed to cache response: {e}")
+        
+        # Submit to thread pool for async execution
+        executor = ThreadPoolExecutor(max_workers=1)
+        executor.submit(cache_in_background)
+        executor.shutdown(wait=False)
+    
     async def process_message(
         self,
         user_id: int,
@@ -266,38 +429,158 @@ class OnboardingOrchestrator:
         Returns:
             Dictionary with response and metadata.
         """
-        # Initialize state
-        initial_state: AgentState = {
-            "user_id": user_id,
-            "user_name": user_name,
-            "user_role": user_role,
-            "user_department": user_department,
-            "user_type": user_type,
-            "current_message": message,
-            "messages": chat_history or [],
-            "tasks": tasks or [],
-            "start_time": datetime.utcnow()
-        }
+        start_time = datetime.utcnow()
         
-        logger.info(f"Processing message for user {user_id}: {message[:50]}...")
+        # Detect query language
+        translation_service = get_translation_service()
+        detected_language = translation_service.detect_language(message)
+        is_arabic = detected_language.value == "ar"
         
-        # Run the graph
+        logger.info(f"Processing message for user {user_id}: {message[:50]}... (language: {detected_language.value})")
+        
+        # Check semantic cache first
+        db = next(get_db())
         try:
-            final_state = await self.graph.ainvoke(initial_state)
+            cache_service = SemanticCacheService(db)
+            cached = cache_service.get_cached_response(message)
             
-            return {
-                "response": final_state.get("response", "I apologize, but I couldn't process your request."),
-                "sources": final_state.get("sources", []),
-                "task_updates": final_state.get("task_updates", []),
-                "routing": {
-                    "predicted_department": final_state.get("predicted_department"),
-                    "prediction_confidence": final_state.get("prediction_confidence"),
-                    "final_department": final_state.get("final_department"),
-                    "was_overridden": final_state.get("was_overridden")
-                },
-                "agent": final_state.get("current_agent"),
-                "total_time_ms": final_state.get("total_time_ms", 0)
-            }
+            if cached:
+                end_time = datetime.utcnow()
+                total_time_ms = (end_time - start_time).total_seconds() * 1000
+                logger.info(f"Returning cached response (type: {cached.get('cache_type')})")
+                
+                return {
+                    "response": cached["response"],
+                    "sources": cached.get("sources", []),
+                    "task_updates": [],
+                    "routing": {
+                        "predicted_department": cached.get("department"),
+                        "prediction_confidence": cached.get("confidence", 1.0),
+                        "final_department": cached.get("department"),
+                        "was_overridden": False,
+                        "is_cached": True,
+                        "cache_type": cached.get("cache_type")
+                    },
+                    "agent": "cache",
+                    "total_time_ms": total_time_ms
+                }
+        except Exception as e:
+            logger.warning(f"Cache check failed: {e}")
+        finally:
+            db.close()
+        
+        # Detect if this is a multi-department query
+        detected_departments = self._detect_multiple_departments(message)
+        is_multi_intent = len(detected_departments) > 1
+        
+        # For Arabic queries or queries with clear keyword matches, bypass the Coordinator's ML routing
+        has_keyword_match = detected_departments and detected_departments[0] != "General"
+        should_bypass_coordinator = is_arabic and has_keyword_match
+        
+        logger.info(f"Detected departments: {detected_departments} (multi-intent: {is_multi_intent}, bypass_coordinator: {should_bypass_coordinator})")
+        
+        try:
+            if is_multi_intent or should_bypass_coordinator:
+                # Process through multiple agents in parallel
+                base_state: AgentState = {
+                    "user_id": user_id,
+                    "user_name": user_name,
+                    "user_role": user_role,
+                    "user_department": user_department,
+                    "user_type": user_type,
+                    "current_message": message,
+                    "messages": chat_history or [],
+                    "tasks": tasks or [],
+                    "start_time": start_time,
+                    "language": detected_language.value,  # Pass detected language
+                    "is_arabic": is_arabic
+                }
+                
+                # Run agents in parallel
+                agent_tasks = [
+                    self._process_single_agent(dept, base_state.copy())
+                    for dept in detected_departments
+                ]
+                
+                responses = await asyncio.gather(*agent_tasks)
+                
+                # Combine responses
+                combined_response = await self._combine_multi_agent_responses(
+                    responses, user_name, message
+                )
+                
+                # Collect all sources
+                all_sources = []
+                all_task_updates = []
+                for resp in responses:
+                    all_sources.extend(resp.get("sources", []))
+                    all_task_updates.extend(resp.get("task_updates", []))
+                
+                end_time = datetime.utcnow()
+                total_time_ms = (end_time - start_time).total_seconds() * 1000
+                
+                # Cache the response
+                self._cache_response(
+                    message, combined_response, all_sources, 
+                    ", ".join(detected_departments), 0.8
+                )
+                
+                return {
+                    "response": combined_response,
+                    "sources": all_sources,
+                    "task_updates": all_task_updates,
+                    "routing": {
+                        "predicted_department": detected_departments[0],
+                        "prediction_confidence": 0.8,
+                        "final_department": ", ".join(detected_departments),
+                        "was_overridden": False,
+                        "is_multi_intent": True,
+                        "departments": detected_departments
+                    },
+                    "agent": ", ".join(detected_departments),
+                    "total_time_ms": total_time_ms
+                }
+            
+            else:
+                # Single department - use the standard graph flow
+                initial_state: AgentState = {
+                    "user_id": user_id,
+                    "user_name": user_name,
+                    "user_role": user_role,
+                    "user_department": user_department,
+                    "user_type": user_type,
+                    "current_message": message,
+                    "messages": chat_history or [],
+                    "tasks": tasks or [],
+                    "start_time": start_time,
+                    "language": detected_language.value,  # Pass detected language
+                    "is_arabic": is_arabic
+                }
+                
+                final_state = await self.graph.ainvoke(initial_state)
+                
+                response = final_state.get("response", "I apologize, but I couldn't process your request.")
+                sources = final_state.get("sources", [])
+                department = final_state.get("final_department")
+                confidence = final_state.get("prediction_confidence", 0.5)
+                
+                # Cache the response
+                self._cache_response(message, response, sources, department, confidence)
+                
+                return {
+                    "response": response,
+                    "sources": sources,
+                    "task_updates": final_state.get("task_updates", []),
+                    "routing": {
+                        "predicted_department": final_state.get("predicted_department"),
+                        "prediction_confidence": confidence,
+                        "final_department": department,
+                        "was_overridden": final_state.get("was_overridden"),
+                        "is_multi_intent": False
+                    },
+                    "agent": final_state.get("current_agent"),
+                    "total_time_ms": final_state.get("total_time_ms", 0)
+                }
             
         except Exception as e:
             logger.error(f"Error processing message: {e}", exc_info=True)

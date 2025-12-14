@@ -10,6 +10,7 @@ from starlette.responses import Response
 import structlog
 
 from app.audit.service import AuditLogger, AuditAction, AuditResource
+from app.database import SessionLocal
 
 logger = structlog.get_logger()
 
@@ -119,20 +120,28 @@ class AuditMiddleware(BaseHTTPMiddleware):
             else:
                 audit_status = "error"
             
-            # Log audit entry
-            audit_logger = AuditLogger()
-            audit_logger.log(
-                action=action,
-                resource_type=resource_type,
-                user_id=user_id,
-                user_email=user_email,
-                session_id=session_id,
-                ip_address=client_ip,
-                user_agent=user_agent,
-                details=details,
-                status=audit_status,
-                error_message=error_message,
-            )
+            # Log audit entry - use database session for persistence
+            db = None
+            try:
+                db = SessionLocal()
+                audit_logger = AuditLogger(db)
+                audit_logger.log(
+                    action=action,
+                    resource_type=resource_type,
+                    user_id=user_id,
+                    user_email=user_email,
+                    session_id=session_id,
+                    ip_address=client_ip,
+                    user_agent=user_agent,
+                    details=details,
+                    status=audit_status,
+                    error_message=error_message,
+                )
+            except Exception as e:
+                logger.error("audit_log_failed", error=str(e))
+            finally:
+                if db:
+                    db.close()
             
             # Log request completion
             logger.info(
@@ -189,6 +198,10 @@ class AuditMiddleware(BaseHTTPMiddleware):
                 return AuditAction.ADMIN_LOGS_VIEW
             return AuditAction.ADMIN_METRICS_VIEW
         
+        # Audit endpoints
+        if "/audit/" in path:
+            return AuditAction.ADMIN_AUDIT_VIEW
+        
         # User endpoints
         if "/users" in path:
             if method == "POST":
@@ -217,6 +230,44 @@ class AuditMiddleware(BaseHTTPMiddleware):
         if "/chat" in path:
             return AuditAction.CHAT_SEND
         
+        # Feedback endpoints
+        if "/feedback" in path:
+            return AuditAction.USER_UPDATE
+        
+        # FAQ endpoints
+        if "/faq" in path:
+            if method == "POST":
+                return AuditAction.USER_CREATE
+            elif method == "GET":
+                return AuditAction.USER_READ
+            elif method in ("PUT", "PATCH"):
+                return AuditAction.USER_UPDATE
+            elif method == "DELETE":
+                return AuditAction.USER_DELETE
+        
+        # Training endpoints
+        if "/training" in path:
+            return AuditAction.USER_READ
+        
+        # Achievement endpoints
+        if "/achievements" in path:
+            return AuditAction.USER_READ
+        
+        # Calendar endpoints
+        if "/calendar" in path:
+            if method == "POST":
+                return AuditAction.USER_CREATE
+            elif method == "GET":
+                return AuditAction.USER_READ
+            elif method in ("PUT", "PATCH"):
+                return AuditAction.USER_UPDATE
+            elif method == "DELETE":
+                return AuditAction.USER_DELETE
+        
+        # Churn endpoints
+        if "/churn" in path:
+            return AuditAction.ADMIN_METRICS_VIEW
+        
         # Default
         return AuditAction.USER_READ
     
@@ -224,14 +275,16 @@ class AuditMiddleware(BaseHTTPMiddleware):
         """Determine resource type based on path."""
         if "/auth/" in path or "/session" in path:
             return AuditResource.SESSION
-        elif "/admin/" in path:
+        elif "/admin/" in path or "/audit/" in path or "/churn" in path:
             return AuditResource.ADMIN
         elif "/users" in path:
             return AuditResource.USER
         elif "/tasks" in path:
             return AuditResource.TASK
-        elif "/chat" in path or "/messages" in path:
+        elif "/chat" in path or "/messages" in path or "/feedback" in path:
             return AuditResource.MESSAGE
+        elif "/faq" in path or "/training" in path or "/achievements" in path or "/calendar" in path:
+            return AuditResource.USER
         else:
             return AuditResource.SYSTEM
 
