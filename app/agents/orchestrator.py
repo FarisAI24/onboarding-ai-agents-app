@@ -473,9 +473,11 @@ class OnboardingOrchestrator:
         detected_departments = self._detect_multiple_departments(message)
         is_multi_intent = len(detected_departments) > 1
         
-        # For Arabic queries or queries with clear keyword matches, bypass the Coordinator's ML routing
+        # For queries with clear keyword matches, bypass the Coordinator's ML routing
+        # This ensures domain-specific terms like "PTO", "VPN", etc. are routed correctly
+        # even if the ML model hasn't been trained on them
         has_keyword_match = detected_departments and detected_departments[0] != "General"
-        should_bypass_coordinator = is_arabic and has_keyword_match
+        should_bypass_coordinator = has_keyword_match  # Bypass for ANY language with keyword match
         
         logger.info(f"Detected departments: {detected_departments} (multi-intent: {is_multi_intent}, bypass_coordinator: {should_bypass_coordinator})")
         
